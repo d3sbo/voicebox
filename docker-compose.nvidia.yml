@@ -1,0 +1,41 @@
+# My local setup: NVIDIA GPU, persistent model cache, started on demand.
+# Run with: docker compose -f docker-compose.nvidia.yml up -d --build
+
+services:
+  voicebox:
+    build: .
+    container_name: voicebox
+    # Deliberately not auto-starting: docker-control.ps1 brings this up
+    # on demand so it isn't holding the 3080 when Ditto/ComfyUI need it.
+    restart: "no"
+    ports:
+      - "17493:17493"
+    volumes:
+      - voicebox_data:/app/data
+      - voicebox_models:/app/models
+      - C:\docker_desktop\tts-server\voice:/voice
+    environment:
+      - TZ=Europe/London
+      - NUMBA_CACHE_DIR=/tmp/numba_cache
+      # config.py maps this onto HF_HUB_CACHE, so model downloads land
+      # in the voicebox_models volume instead of the container layer.
+      - VOICEBOX_MODELS_DIR=/app/models
+      # Anything that downloads via torch.hub rather than HF.
+      - TORCH_HOME=/app/models/torch
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  voicebox_data:
+  voicebox_models:
